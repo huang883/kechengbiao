@@ -220,7 +220,7 @@ class _EditorState extends State<_Editor> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('选择原课表中的课程，可只调其中一节。单节调课优先于整天调课和停课设置。'),
+              const Text('选择原课表中的课程，可只调其中一节。目标原有课程保留，停课日也可单独安排调入课程。'),
               const SizedBox(height: 16),
               dateField(source, '来源日期'),
               if (rules.isEmpty) const Text('来源当天原课表没有课程，请选择其他日期。'),
@@ -352,7 +352,7 @@ class _EditorState extends State<_Editor> {
           title: const Text('确认单节调课'),
           content: SingleChildScrollView(
             child: Text(
-              '${snapshot.courses.singleWhere((c) => c.id == selected!.courseId).name}\n${lessonTransferLabel(snapshot.semester, t)}\n\n调至 ${dateText(t.targetDate)}（${dateLabel(target.text)}）${sectionLabel(t.targetStart, t.targetEnd)}\n${keep ? '来源所选节次保留' : '来源所选节次移走，其他节次保留'}\n\n${affected.isEmpty ? '目标所选节次当前无课程。' : '将覆盖目标所选节次内的：${affected.map((i) => i.title).toSet().join('、')}。其余节次保留。'}\n保存后可修改或撤销。',
+              '${snapshot.courses.singleWhere((c) => c.id == selected!.courseId).name}\n${lessonTransferLabel(snapshot.semester, t)}\n\n调至 ${dateText(t.targetDate)}（${dateLabel(target.text)}）${sectionLabel(t.targetStart, t.targetEnd)}\n${keep ? '来源所选节次保留' : '来源所选节次移走，其他节次保留'}\n\n${affected.isEmpty ? '目标所选节次当前无课程。' : '与目标原有课程时间冲突：${affected.map((i) => i.title).toSet().join('、')}。调入课程与原有课程均保留，请检查安排。'}\n保存后可修改或撤销。',
             ),
           ),
           actions: [

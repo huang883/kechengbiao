@@ -1,7 +1,7 @@
 name: campus_time
 description: "课间：大学课程与个人时间管理。"
 publish_to: 'none'
-version: 0.2.0+16
+version: 0.2.1+17
 
 environment:
   sdk: ^3.13.5

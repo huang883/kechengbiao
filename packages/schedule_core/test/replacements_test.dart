@@ -37,18 +37,20 @@ void main() {
     final filter = CourseFilterService(s, rules,
         daysOff: [ClassDayOff(date: b, reason: 'holiday')],
         replacements: replacements);
-    expect(filter.getCoursesForDate(b).single.id, 'source');
+    expect(filter.getCoursesForDate(b).single.originalScheduleId, 'source');
     expect(filter.getCoursesForDate(b).single.weekday, 4);
     expect(filter.getCoursesForDate(a).single.id, 'source');
-    expect(filter.getCoursesForDate(c).single.id, 'target');
-    expect(filter.getCoursesForWeek(5).single.id, 'source');
+    expect(filter.getCoursesForDate(c).map((r) => r.originalScheduleId ?? r.id),
+        ['target', 'target']);
+    expect(filter.getCoursesForDate(c).map((r) => r.id).toSet().length, 2);
+    expect(filter.getCoursesForWeek(5).single.originalScheduleId, 'source');
     expect(replacementLabel(s, replacements.first), '由第 6 周星期三（10/7）调入');
     expect(
         CourseFilterService(s, rules, replacements: [
           ClassDayReplacement(
               sourceDate: DateTime.utc(2026, 10, 10), targetDate: c)
-        ]).getCoursesForDate(c),
-        isEmpty);
+        ]).getCoursesForDate(c).single.id,
+        'target');
     expect(() => ClassDayReplacement(sourceDate: a, targetDate: a),
         throwsFormatException);
   });
@@ -74,15 +76,15 @@ void main() {
         startTime: '08:15',
         endTime: '08:17');
     final items = TimelineService().forDate(b, snap, [task]).items;
-    expect(items.first.sourceId, 'source');
+    expect(items.first.schedule!.originalScheduleId, 'source');
     expect(items.first.startDateTime, DateTime.utc(2026, 10, 1, 8));
     expect(items.first.subtitle, contains('第 6 周星期三'));
     expect(items.last.sourceType, 'task');
     expect(
         ConflictDetectionService()
             .findConflicts(items.last, items)
-            .single
-            .sourceId,
-        'source');
+            .map((i) => i.schedule!.originalScheduleId ?? i.sourceId)
+            .toSet(),
+        {'source', 'target'});
   });
 }

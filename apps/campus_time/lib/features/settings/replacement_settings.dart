@@ -75,7 +75,7 @@ class _ReplacementSheet extends ConsumerWidget {
                 ),
                 LessonTransferCards(app: app),
                 const Divider(),
-                const Text('整天调课：复制来源当天原始课表，来源日保持不变。单节调课优先；个人待办不变。'),
+                const Text('整天调课：复制来源当天原始课表，来源日保持不变。目标原有课程及个人待办保留。'),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () => showDialog<void>(
@@ -206,7 +206,7 @@ class _ReplacementEditorState extends State<_ReplacementEditor> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('选择来源原课表及被覆盖的一天。来源日已有的停课或调课不参与复制。'),
+          const Text('选择来源原课表及调入日期，目标原有课程保留。来源日已有的停课或调课不参与复制。'),
           const SizedBox(height: 16),
           TextField(
             controller: source,
@@ -225,11 +225,11 @@ class _ReplacementEditorState extends State<_ReplacementEditor> {
             controller: target,
             enabled: !saving && widget.existing == null,
             decoration: InputDecoration(
-              labelText: '覆盖日期 YYYY-MM-DD',
+              labelText: '调入日期 YYYY-MM-DD',
               suffixIcon: widget.existing != null
                   ? null
                   : IconButton(
-                      tooltip: '选择覆盖日期',
+                      tooltip: '选择调入日期',
                       onPressed: saving ? null : () => pick(target),
                       icon: const Icon(Icons.calendar_month),
                     ),
@@ -270,7 +270,7 @@ class _ReplacementEditorState extends State<_ReplacementEditor> {
                   final yes = await showDialog<bool>(
                     context: context,
                     builder: (c) => AlertDialog(
-                      title: const Text('确认覆盖课程'),
+                      title: const Text('确认调入课程'),
                       content: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -280,9 +280,11 @@ class _ReplacementEditorState extends State<_ReplacementEditor> {
                               '${dateText(r.targetDate)}（第 ${calc.getWeekForDate(r.targetDate)} 周星期${'一二三四五六日'[r.targetDate.weekday - 1]}）\n${replacementLabel(snap.semester, r)}',
                             ),
                             const SizedBox(height: 12),
-                            Text('目标原有 $count 条课程将被替换为 ${rules.length} 条。'),
+                            Text(
+                              '目标现有 $count 条课程不会被覆盖，将另行调入 ${rules.length} 条；时间冲突时并排显示。',
+                            ),
                             if (rules.isEmpty)
-                              const Text('来源当天原课表为空，保存后目标当天将没有课程。'),
+                              const Text('来源当天原课表为空，目标原有课程不变。'),
                             for (final rule in rules)
                               Text(
                                 '• ${snap.courses.singleWhere((c) => c.id == rule.courseId).name} · 第 ${rule.startSection}—${rule.endSection} 节',

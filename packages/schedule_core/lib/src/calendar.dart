@@ -132,32 +132,32 @@ class CourseFilterService {
   List<CourseSchedule> getCoursesForDate(DateTime date) {
     final target = _day(date), calculator = SemesterWeekCalculator(semester);
     if (calculator.getWeekForDate(target) == null) return [];
-    final source = _replacements[target],
-        effective = _replacements[target] ?? target;
-    final week = calculator.getWeekForDate(effective);
-    var result = <CourseSchedule>[];
-    if (week != null && (source != null || !_daysOff.contains(target))) {
-      result = schedules
+    final source = _replacements[target];
+    List<CourseSchedule> original(DateTime day) {
+      final week = calculator.getWeekForDate(day);
+      if (week == null) return [];
+      return schedules
           .where((s) =>
               s.semesterId == semester.id &&
-              s.weekday == effective.weekday &&
+              s.weekday == day.weekday &&
               s.activeWeeks.contains(week))
-          .map((s) => source == null
-              ? s
-              : _copy(s, target, s.startSection, s.endSection,
-                  id: s.id,
-                  label: replacementLabel(
-                      semester,
-                      ClassDayReplacement(
-                          sourceDate: source, targetDate: target))))
           .toList();
     }
+
+    // Normal lessons remain intact even when a day or single lesson is moved here.
+    var result =
+        _daysOff.contains(target) ? <CourseSchedule>[] : original(target);
     for (final t in lessonTransfers
         .where((t) => t.sourceDate == target && !t.keepSource)) {
-      // A day replacement uses another day's source, so never remove an unrelated occurrence.
-      if (source == null) {
-        result = _cut(result, target, t.sourceStart, t.sourceEnd,
-            scheduleId: t.scheduleId);
+      result = _cut(result, target, t.sourceStart, t.sourceEnd,
+          scheduleId: t.scheduleId);
+    }
+    if (source != null) {
+      for (final s in original(source)) {
+        result.add(_copy(s, target, s.startSection, s.endSection,
+            id: 'day-transfer:${target.toIso8601String()}:${s.id}',
+            label: replacementLabel(semester,
+                ClassDayReplacement(sourceDate: source, targetDate: target))));
       }
     }
     for (final t in lessonTransfers.where((t) => t.targetDate == target)) {
@@ -165,8 +165,7 @@ class CourseFilterService {
           .where((s) => s.id == t.scheduleId && s.semesterId == semester.id)
           .firstOrNull;
       if (rule == null) continue;
-      if (t.targetStartTime == null)
-        result = _cut(result, target, t.targetStart, t.targetEnd);
+      // Moving into an occupied slot is a visible conflict, never a deletion.
       result.add(_copy(rule, target, t.targetStart, t.targetEnd,
           id: 'transfer:${t.id}',
           label: lessonTransferLabel(semester, t),

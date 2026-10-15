@@ -13,6 +13,7 @@ Future<void> openTaskEditor(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
+  showDragHandle: true,
   builder: (_) => TaskEditor(app: app, task: task),
 );
 
@@ -192,14 +193,31 @@ class _TaskEditorState extends State<TaskEditor> {
     }
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .82,
-        child: ListView(
+      child: DraggableScrollableSheet(
+        initialChildSize: .82,
+        minChildSize: .25,
+        maxChildSize: .95,
+        expand: false,
+        shouldCloseOnMinExtent: true,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(24),
           children: [
-            Text(
-              widget.task == null ? '新建待办' : '编辑待办',
-              style: Theme.of(context).textTheme.headlineSmall,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.task == null ? '新建待办' : '编辑待办',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '关闭待办窗口',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             TextField(

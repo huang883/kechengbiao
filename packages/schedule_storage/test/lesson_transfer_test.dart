@@ -31,6 +31,10 @@ void main() {
       );
       raw.execute("INSERT INTO schedule_weeks VALUES ('a',6)");
       raw.execute(
+        "INSERT INTO course_schedules VALUES ('b','c','s',4,1,2,'original target','')",
+      );
+      raw.execute("INSERT INTO schedule_weeks VALUES ('b',6)");
+      raw.execute(
         "INSERT INTO class_times VALUES ('s',1,'08:00','08:45'),('s',2,'08:55','09:40')",
       );
       raw.execute(
@@ -69,6 +73,18 @@ void main() {
         db = ScheduleDatabase.file(File(path));
         final snap = (await DriftCourseRepository(db).loadSemester('s'))!;
         expect(snap.lessonTransfers.single.keepSource, isTrue);
+        final effective = CourseFilterService(
+          snap.semester,
+          snap.schedules,
+          lessonTransfers: snap.lessonTransfers,
+        ).getCoursesForDate(DateTime.utc(2026, 10, 8));
+        expect(effective, hasLength(2));
+        final originalTarget = effective.singleWhere((r) => r.id == 'b');
+        expect(
+          (originalTarget.startSection, originalTarget.endSection),
+          (1, 2),
+        );
+        expect(effective.any((r) => r.id == 'transfer:t'), isTrue);
         expect(snap.daysOff.length, 1);
         expect(snap.replacements.length, 1);
         expect(snap.classTimes.length, 2);

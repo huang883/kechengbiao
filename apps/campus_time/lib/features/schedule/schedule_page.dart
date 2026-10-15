@@ -205,223 +205,269 @@ class SchedulePage extends ConsumerWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, box) {
-                final width = box.maxWidth, dayWidth = (width - 40) / 7;
-                return Column(
-                  children: [
-                    Row(
+                final cardWidth = math.max(48.0, (box.maxWidth - 40) / 7);
+                final dayWidths = [
+                  for (final day in days)
+                    cardWidth * _lanes(day.items, pixelsPerMinute).count,
+                ];
+                final offsets = [
+                  for (var i = 0; i < 7; i++)
+                    dayWidths.take(i).fold<double>(0, (a, b) => a + b),
+                ];
+                final width = 40 + dayWidths.fold<double>(0, (a, b) => a + b);
+                return SingleChildScrollView(
+                  key: const ValueKey('week-horizontal-scroll'),
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: width,
+                    height: box.maxHeight,
+                    child: Column(
                       children: [
-                        const SizedBox(width: 40),
-                        for (final date in dates)
-                          SizedBox(
-                            width: dayWidth,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: dateText(date) == dateText(app.now)
-                                    ? const Color(0xFFDDECE4)
-                                    : Colors.white,
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    '周${'一二三四五六日'[date.weekday - 1]}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                        Row(
+                          children: [
+                            const SizedBox(width: 40),
+                            for (
+                              var dayIndex = 0;
+                              dayIndex < dates.length;
+                              dayIndex++
+                            )
+                              SizedBox(
+                                width: dayWidths[dayIndex],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
                                   ),
-                                  Text(
-                                    '${date.month}/${date.day}',
-                                    style: const TextStyle(
-                                      fontSize: 10,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        dateText(dates[dayIndex]) ==
+                                            dateText(app.now)
+                                        ? const Color(0xFFDDECE4)
+                                        : Colors.white,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        '周${'一二三四五六日'[dates[dayIndex].weekday - 1]}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${dates[dayIndex].month}/${dates[dayIndex].day}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        Expanded(
+                          child: ListView(
+                            children: [
+                              if (width > box.maxWidth + 1)
+                                const Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: Text(
+                                    '重叠课程和待办并排显示，可左右滑动查看',
+                                    style: TextStyle(
+                                      fontSize: 12,
                                       color: Colors.black54,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    Expanded(
-                      child: ListView(
-                        children: [
-                          if (untimed.isNotEmpty) ...[
-                            const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Text('不指定时间的待办'),
-                            ),
-                            for (final task in untimed)
-                              UntimedTaskTile(
-                                app: app,
-                                task: task,
-                                showDate: true,
-                              ),
-                          ],
-                          if (off.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Text(
-                                '停课：${off.map((d) => "${d.date.month}/${d.date.day} ${d.reason}").join("、")}（待办不受影响）',
-                              ),
-                            ),
-                          for (final t in snapshot.lessonTransfers.where(
-                            (t) =>
-                                !t.targetDate.isBefore(range.start) &&
-                                !t.targetDate.isAfter(range.end),
-                          ))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              child: Text(
-                                '${t.targetDate.month}/${t.targetDate.day} ${sectionLabel(t.targetStart, t.targetEnd)}：${lessonTransferLabel(snapshot.semester, t)}',
-                              ),
-                            ),
-                          for (final r in replacements)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              child: Text(
-                                '${r.targetDate.month}/${r.targetDate.day}：${replacementLabel(snapshot.semester, r)}',
-                              ),
-                            ),
-                          SizedBox(
-                            height: height + 50,
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: GestureDetector(
-                                    key: const ValueKey('course-grid-empty'),
-                                    behavior: HitTestBehavior.opaque,
-                                    onTapUp: (event) {
-                                      final x = event.localPosition.dx - 40;
-                                      if (x < 0) return;
-                                      final day = (x / dayWidth).floor().clamp(
-                                        0,
-                                        6,
-                                      );
-                                      if (SemesterWeekCalculator(
-                                            snapshot.semester,
-                                          ).getWeekForDate(dates[day]) ==
-                                          null) {
-                                        message(
-                                          context,
-                                          '该日期不在当前学期内，请选择学期内的日期',
-                                        );
-                                        return;
-                                      }
-                                      final minute =
-                                          (firstHour * 60 +
-                                                  event.localPosition.dy /
-                                                      pixelsPerMinute)
-                                              .floor()
-                                              .clamp(0, 1438);
-                                      openCourseEditor(
-                                        context,
-                                        app,
-                                        date: dates[day],
-                                        minute: minute,
-                                      );
-                                    },
+                                ),
+                              if (untimed.isNotEmpty) ...[
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  child: Text('不指定时间的待办'),
+                                ),
+                                for (final task in untimed)
+                                  UntimedTaskTile(
+                                    app: app,
+                                    task: task,
+                                    showDate: true,
+                                  ),
+                              ],
+                              if (off.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Text(
+                                    '停课：${off.map((d) => "${d.date.month}/${d.date.day} ${d.reason}").join("、")}（待办不受影响）',
                                   ),
                                 ),
-                                for (final m in tickMinutes)
-                                  Positioned(
-                                    top: (m - firstHour * 60) * pixelsPerMinute,
-                                    left: 0,
-                                    right: 0,
-                                    child: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 40,
-                                          child: Text(
-                                            '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}${ticks[m]!.isEmpty ? '' : ' ${ticks[m]}'}',
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              fontSize: 8,
-                                              height: 1,
-                                              color: ticks[m]!.contains('下')
-                                                  ? const Color(0xFF98623F)
-                                                  : Colors.black54,
+                              for (final t in snapshot.lessonTransfers.where(
+                                (t) =>
+                                    !t.targetDate.isBefore(range.start) &&
+                                    !t.targetDate.isAfter(range.end),
+                              ))
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  child: Text(
+                                    '${t.targetDate.month}/${t.targetDate.day} ${sectionLabel(t.targetStart, t.targetEnd)}：${lessonTransferLabel(snapshot.semester, t)}',
+                                  ),
+                                ),
+                              for (final r in replacements)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  child: Text(
+                                    '${r.targetDate.month}/${r.targetDate.day}：${replacementLabel(snapshot.semester, r)}',
+                                  ),
+                                ),
+                              SizedBox(
+                                height: height + 50,
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: GestureDetector(
+                                        key: const ValueKey(
+                                          'course-grid-empty',
+                                        ),
+                                        behavior: HitTestBehavior.opaque,
+                                        onTapUp: (event) {
+                                          final x = event.localPosition.dx - 40;
+                                          if (x < 0) return;
+                                          final day = List.generate(7, (i) => i)
+                                              .firstWhere(
+                                                (i) =>
+                                                    x <
+                                                    offsets[i] + dayWidths[i],
+                                                orElse: () => 6,
+                                              );
+                                          if (SemesterWeekCalculator(
+                                                snapshot.semester,
+                                              ).getWeekForDate(dates[day]) ==
+                                              null) {
+                                            message(
+                                              context,
+                                              '该日期不在当前学期内，请选择学期内的日期',
+                                            );
+                                            return;
+                                          }
+                                          final minute =
+                                              (firstHour * 60 +
+                                                      event.localPosition.dy /
+                                                          pixelsPerMinute)
+                                                  .floor()
+                                                  .clamp(0, 1438);
+                                          openCourseEditor(
+                                            context,
+                                            app,
+                                            date: dates[day],
+                                            minute: minute,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    for (final m in tickMinutes)
+                                      Positioned(
+                                        top:
+                                            (m - firstHour * 60) *
+                                            pixelsPerMinute,
+                                        left: 0,
+                                        right: 0,
+                                        child: Row(
+                                          children: [
+                                            SizedBox(
+                                              width: 40,
+                                              child: Text(
+                                                '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}${ticks[m]!.isEmpty ? '' : ' ${ticks[m]}'}',
+                                                maxLines: 1,
+                                                style: TextStyle(
+                                                  fontSize: 8,
+                                                  height: 1,
+                                                  color: ticks[m]!.contains('下')
+                                                      ? const Color(0xFF98623F)
+                                                      : Colors.black54,
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Divider(
+                                                height: 1,
+                                                color: ticks[m]!.contains('下')
+                                                    ? const Color(0xFFE5CDBB)
+                                                    : const Color(0xFFE2E6DF),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    for (var day = 0; day < 7; day++)
+                                      ..._cards(
+                                        context,
+                                        app,
+                                        days[day].items,
+                                        offsets[day],
+                                        dayWidths[day],
+                                        firstHour,
+                                        pixelsPerMinute,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              if (missing.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    children: [
+                                      InfoCard(
+                                        '${missing.length} 条课程缺少上课钟点，暂列在下方。',
+                                        onTap: () => context.go('/settings'),
+                                      ),
+                                      for (final rule in missing)
+                                        Card(
+                                          child: ListTile(
+                                            title: Text(
+                                              snapshot.courses
+                                                  .singleWhere(
+                                                    (c) =>
+                                                        c.id == rule.courseId,
+                                                  )
+                                                  .name,
+                                            ),
+                                            subtitle: Text(
+                                              '周${'一二三四五六日'[rule.weekday - 1]} 第 ${rule.startSection}—${rule.endSection} 节 · ${rule.classroom}',
+                                            ),
+                                            onTap: () => openCourseEditor(
+                                              context,
+                                              app,
+                                              schedule: rule,
                                             ),
                                           ),
                                         ),
-                                        Expanded(
-                                          child: Divider(
-                                            height: 1,
-                                            color: ticks[m]!.contains('下')
-                                                ? const Color(0xFFE5CDBB)
-                                                : const Color(0xFFE2E6DF),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
-                                for (var day = 0; day < 7; day++)
-                                  ..._cards(
-                                    context,
-                                    app,
-                                    days[day].items,
-                                    day,
-                                    dayWidth,
-                                    firstHour,
-                                    pixelsPerMinute,
+                                ),
+                              if (all.isEmpty &&
+                                  missing.isEmpty &&
+                                  untimed.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text(
+                                    '这一周没有课程或待办',
+                                    textAlign: TextAlign.center,
                                   ),
-                              ],
-                            ),
+                                ),
+                              const SizedBox(height: 30),
+                            ],
                           ),
-                          if (missing.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  InfoCard(
-                                    '${missing.length} 条课程缺少上课钟点，暂列在下方。',
-                                    onTap: () => context.go('/settings'),
-                                  ),
-                                  for (final rule in missing)
-                                    Card(
-                                      child: ListTile(
-                                        title: Text(
-                                          snapshot.courses
-                                              .singleWhere(
-                                                (c) => c.id == rule.courseId,
-                                              )
-                                              .name,
-                                        ),
-                                        subtitle: Text(
-                                          '周${'一二三四五六日'[rule.weekday - 1]} 第 ${rule.startSection}—${rule.endSection} 节 · ${rule.classroom}',
-                                        ),
-                                        onTap: () => openCourseEditor(
-                                          context,
-                                          app,
-                                          schedule: rule,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          if (all.isEmpty && missing.isEmpty && untimed.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Text(
-                                '这一周没有课程或待办',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          const SizedBox(height: 30),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 );
               },
             ),
@@ -435,29 +481,17 @@ class SchedulePage extends ConsumerWidget {
     BuildContext context,
     AppController app,
     List<TimelineItem> items,
-    int day,
+    double offset,
     double width,
     int first,
     double scale,
   ) {
-    // Greedy interval lanes keep overlapping tasks visible instead of covering a course.
-    final lanes = <DateTime>[];
-    final positions = <int>[];
-    for (final item in items) {
-      var lane = lanes.indexWhere((end) => !end.isAfter(item.startDateTime));
-      if (lane < 0) {
-        lane = lanes.length;
-        lanes.add(_visualEnd(item, scale));
-      } else {
-        lanes[lane] = _visualEnd(item, scale);
-      }
-      positions.add(lane);
-    }
-    final count = math.max(1, lanes.length);
+    final layout = _lanes(items, scale);
+    final positions = layout.positions, count = layout.count;
     return [
       for (var i = 0; i < items.length; i++)
         Positioned(
-          left: 40 + day * width + positions[i] * width / count + 1,
+          left: 40 + offset + positions[i] * width / count + 1,
           width: width / count - 2,
           top:
               (items[i].startDateTime.hour * 60 +
@@ -471,6 +505,7 @@ class SchedulePage extends ConsumerWidget {
                 2,
           ),
           child: Material(
+            key: ValueKey('week-card-${items[i].id}'),
             color: courseColor(
               items[i].color,
               items[i].title,
@@ -513,6 +548,25 @@ class SchedulePage extends ConsumerWidget {
           ),
         ),
     ];
+  }
+
+  ({List<int> positions, int count}) _lanes(
+    List<TimelineItem> items,
+    double scale,
+  ) {
+    final lanes = <DateTime>[];
+    final positions = <int>[];
+    for (final item in items) {
+      var lane = lanes.indexWhere((end) => !end.isAfter(item.startDateTime));
+      if (lane < 0) {
+        lane = lanes.length;
+        lanes.add(_visualEnd(item, scale));
+      } else {
+        lanes[lane] = _visualEnd(item, scale);
+      }
+      positions.add(lane);
+    }
+    return (positions: positions, count: math.max(1, lanes.length));
   }
 
   DateTime _visualEnd(TimelineItem item, double scale) =>

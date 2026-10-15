@@ -42,14 +42,14 @@ void main() {
           lessonTransfers: t,
           daysOff: off ? [ClassDayOff(date: b, reason: 'off')] : []);
   test(
-      'single section moves and splits target while preserving both remainders; undo restores',
+      'single section moves without cutting occupied target; undo restores source',
       () {
     final t = transfer(), f = filter([transfer()]);
     expect(f.getCoursesForDate(a).map((s) => (s.startSection, s.endSection)),
         [(2, 2)]);
     final result = f.getCoursesForDate(b);
     expect(result.map((s) => (s.courseId, s.startSection, s.endSection)),
-        [('b', 1, 1), ('a', 2, 2), ('b', 3, 4)]);
+        [('b', 1, 4), ('a', 2, 2)]);
     expect(result[1].adjustmentLabel, contains('第 6 周星期三第 1 节'));
     expect(filter([]).getCoursesForDate(a).single.endSection, 2);
     expect(filter([]).getCoursesForDate(b).single.endSection, 4);
@@ -59,7 +59,7 @@ void main() {
     expect(filter([t], off: true).getCoursesForDate(b).single.courseId, 'a');
   });
   test(
-      'target clock, unique timeline IDs and conflict detection reflect split lessons',
+      'target clock and original course coexist with unique IDs and conflict detection',
       () {
     final snap = SemesterSnapshot(semester: semester, courses: [
       const Course(id: 'a', name: 'English', teacher: 'T'),
@@ -78,15 +78,18 @@ void main() {
       transfer()
     ]);
     final items = TimelineService().forDate(b, snap, []).items;
-    expect(items.map((i) => i.id).toSet().length, 3);
+    expect(items.map((i) => i.id).toSet().length, 2);
     expect(items[1].startDateTime, DateTime.utc(2026, 10, 8, 9));
     expect(items[1].schedule!.startSection, 2);
     expect(items[1].subtitle, contains('第 1 节'));
     final candidate = TimelineService().taskItem(TaskEvent(
         id: 'task', title: 'x', date: b, startTime: '09:15', endTime: '09:20'));
     expect(
-        ConflictDetectionService().findConflicts(candidate, items).single.title,
-        'English');
+        ConflictDetectionService()
+            .findConflicts(candidate, items)
+            .map((i) => i.title)
+            .toSet(),
+        {'English', 'Math'});
   });
   test(
       'same-day disjoint move works, overlapping source and destination rejected',
