@@ -1,0 +1,151 @@
+CREATE TABLE semesters (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(trim(name)) > 0 AND name <> 'unclear'),
+  start_date TEXT NOT NULL CHECK (length(start_date) = 10 AND COALESCE(date(start_date, '+0 days') = start_date, 0)),
+  end_date TEXT NOT NULL CHECK (length(end_date) = 10 AND COALESCE(date(end_date, '+0 days') = end_date, 0)),
+  total_weeks INTEGER NOT NULL CHECK (total_weeks BETWEEN 1 AND 366),
+  week_start_day INTEGER NOT NULL CHECK (week_start_day BETWEEN 1 AND 7),
+  manual_week_offset INTEGER NOT NULL DEFAULT 0,
+  CHECK (end_date >= start_date)
+);
+
+CREATE TABLE courses (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL CHECK (length(trim(name)) > 0 AND name <> 'unclear'),
+  teacher TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'default',
+  remark TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE course_schedules (
+  id TEXT NOT NULL PRIMARY KEY,
+  course_id TEXT NOT NULL REFERENCES courses(id),
+  semester_id TEXT NOT NULL REFERENCES semesters(id),
+  weekday INTEGER NOT NULL CHECK (weekday BETWEEN 1 AND 7),
+  start_section INTEGER NOT NULL CHECK (start_section >= 1),
+  end_section INTEGER NOT NULL CHECK (end_section >= start_section),
+  classroom TEXT NOT NULL,
+  remark TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX schedules_semester_day ON course_schedules(semester_id, weekday, start_section);
+
+CREATE TABLE schedule_weeks (
+  schedule_id TEXT NOT NULL REFERENCES course_schedules(id) ON DELETE CASCADE,
+  active_week INTEGER NOT NULL CHECK (active_week >= 1),
+  PRIMARY KEY (schedule_id, active_week)
+);
+CREATE TRIGGER check_week_insert BEFORE INSERT ON schedule_weeks BEGIN
+  SELECT CASE WHEN NEW.active_week > (SELECT s.total_weeks FROM semesters s
+    JOIN course_schedules c ON c.semester_id = s.id WHERE c.id = NEW.schedule_id)
+    THEN RAISE(ABORT, 'Active week exceeds semester') END;
+END;
+CREATE TRIGGER check_week_update BEFORE UPDATE ON schedule_weeks BEGIN
+  SELECT CASE WHEN NEW.active_week > (SELECT s.total_weeks FROM semesters s
+    JOIN course_schedules c ON c.semester_id = s.id WHERE c.id = NEW.schedule_id)
+    THEN RAISE(ABORT, 'Active week exceeds semester') END;
+END;
+CREATE TRIGGER check_semester_shrink BEFORE UPDATE OF total_weeks ON semesters BEGIN
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM schedule_weeks w JOIN course_schedules c
+    ON c.id = w.schedule_id WHERE c.semester_id = NEW.id AND w.active_week > NEW.total_weeks)
+    THEN RAISE(ABORT, 'Existing active weeks exceed new semester') END;
+END;
+
+CREATE TABLE class_times (
+  semester_id TEXT NOT NULL REFERENCES semesters(id),
+  section INTEGER NOT NULL CHECK (section >= 1),
+  start_time TEXT NOT NULL CHECK (start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND start_time < '24:00'),
+  end_time TEXT NOT NULL CHECK (end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time < '24:00'),
+  PRIMARY KEY (semester_id, section),
+  CHECK (end_time > start_time)
+);
+
+CREATE TABLE task_events (
+  id TEXT NOT NULL PRIMARY KEY CHECK (length(trim(id)) > 0),
+  title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+  event_date TEXT NOT NULL CHECK (length(event_date) = 10 AND COALESCE(date(event_date, '+0 days') = event_date, 0)),
+  start_time TEXT CHECK (start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND start_time < '24:00'),
+  end_time TEXT CHECK (end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time < '24:00'),
+  description TEXT NOT NULL DEFAULT '',
+  completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+  reminder_minutes INTEGER CHECK (reminder_minutes >= 0),
+  repeat_rule TEXT CHECK (repeat_rule IS NULL),
+  CHECK ((start_time IS NULL AND end_time IS NULL AND reminder_minutes IS NULL) OR (start_time IS NOT NULL AND end_time IS NOT NULL AND end_time > start_time))
+);
+CREATE INDEX tasks_date_time ON task_events(event_date, start_time);
+
+CREATE TABLE import_drafts (
+  source_hash TEXT NOT NULL PRIMARY KEY,
+  current_revision INTEGER NOT NULL CHECK (current_revision >= 1),
+  original_json TEXT NOT NULL CHECK (json_valid(original_json))
+);
+CREATE TABLE import_revisions (
+  source_hash TEXT NOT NULL REFERENCES import_drafts(source_hash),
+  revision INTEGER NOT NULL CHECK (revision >= 1),
+  reviewed_json TEXT NOT NULL CHECK (json_valid(reviewed_json)),
+  exclusions_json TEXT NOT NULL CHECK (json_valid(exclusions_json)),
+  reason TEXT NOT NULL,
+  PRIMARY KEY (source_hash, revision)
+);
+CREATE TABLE import_commits (
+  source_hash TEXT NOT NULL PRIMARY KEY,
+  revision INTEGER NOT NULL,
+  semester_id TEXT NOT NULL UNIQUE REFERENCES semesters(id),
+  course_count INTEGER NOT NULL,
+  schedule_count INTEGER NOT NULL,
+  FOREIGN KEY (source_hash, revision) REFERENCES import_revisions(source_hash, revision)
+);
+CREATE TABLE import_record_metadata (
+  schedule_id TEXT NOT NULL PRIMARY KEY REFERENCES course_schedules(id),
+  source_hash TEXT NOT NULL,
+  draft_revision INTEGER NOT NULL,
+  record_id TEXT NOT NULL,
+  teaching_class TEXT NOT NULL,
+  total_hours INTEGER,
+  credits INTEGER,
+  source_json TEXT NOT NULL CHECK (json_valid(source_json)),
+  FOREIGN KEY (source_hash, draft_revision) REFERENCES import_revisions(source_hash, revision)
+);
+
+CREATE TABLE class_days_off (
+  semester_id TEXT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  day TEXT NOT NULL CHECK (length(day) = 10 AND COALESCE(date(day, '+0 days') = day, 0)),
+  reason TEXT NOT NULL CHECK (length(trim(reason)) > 0),
+  PRIMARY KEY (semester_id, day)
+);
+
+
+CREATE TABLE class_day_replacements (
+  semester_id TEXT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  target_day TEXT NOT NULL CHECK(length(target_day)=10 AND date(target_day)=target_day),
+  source_day TEXT NOT NULL CHECK(length(source_day)=10 AND date(source_day)=source_day),
+  PRIMARY KEY (semester_id, target_day),
+  CHECK (source_day <> target_day)
+);
+
+CREATE TABLE lesson_transfers (
+ id TEXT NOT NULL PRIMARY KEY,
+ semester_id TEXT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+ schedule_id TEXT NOT NULL REFERENCES course_schedules(id) ON DELETE CASCADE,
+ source_day TEXT NOT NULL,
+ target_day TEXT NOT NULL,
+ source_start INTEGER NOT NULL CHECK(source_start > 0),
+ source_end INTEGER NOT NULL CHECK(source_end >= source_start),
+ target_start INTEGER NOT NULL CHECK(target_start > 0),
+ keep_source INTEGER NOT NULL CHECK(keep_source IN (0,1))
+);
+
+CREATE TABLE course_schedule_times (
+  schedule_id TEXT NOT NULL PRIMARY KEY REFERENCES course_schedules(id) ON DELETE CASCADE,
+  start_time TEXT NOT NULL CHECK (start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND start_time < '24:00'),
+  end_time TEXT NOT NULL CHECK (end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time < '24:00'),
+  CHECK (end_time > start_time)
+);
+
+CREATE TABLE lesson_transfer_edits (
+ transfer_id TEXT NOT NULL PRIMARY KEY REFERENCES lesson_transfers(id) ON DELETE CASCADE,
+ end_section INTEGER NOT NULL CHECK(end_section >= 1),
+ start_time TEXT,
+ end_time TEXT,
+ classroom TEXT NOT NULL,
+ CHECK((start_time IS NULL AND end_time IS NULL) OR (start_time IS NOT NULL AND end_time IS NOT NULL AND start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time < '24:00' AND end_time > start_time))
+);

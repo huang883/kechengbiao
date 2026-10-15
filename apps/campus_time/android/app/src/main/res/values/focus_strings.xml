@@ -1,0 +1,1 @@
+<resources><string name="focus_service_description">仅在你主动开始专注后，检测前台应用包名并遮挡非白名单应用。不读取屏幕文字、输入内容或通讯录，不上传数据。电话、系统设置和安全退出始终可用。可随时在此关闭服务。</string></resources>

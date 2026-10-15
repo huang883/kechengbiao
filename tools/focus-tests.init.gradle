@@ -1,0 +1,19 @@
+allprojects {
+    afterEvaluate {
+        if (rootProject.name == "gradle") return
+        repositories {
+            clear()
+            maven { url 'https://repo.maven.apache.org/maven2' }
+            maven { url 'https://maven.aliyun.com/repository/google' }
+            maven { url 'https://storage.flutter-io.cn/download.flutter.io' }
+        }
+        configurations.configureEach {
+            exclude group: 'io.flutter', module: 'armeabi_v7a_debug'
+            exclude group: 'io.flutter', module: 'arm64_v8a_debug'
+            exclude group: 'io.flutter', module: 'x86_64_debug'
+        }
+        tasks.withType(Test).configureEach {
+            systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
+        }
+    }
+}

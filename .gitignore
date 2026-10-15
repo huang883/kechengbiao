@@ -1,0 +1,32 @@
+.tools/
+tmp/
+.dart_tool/
+build/
+*.pdf
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+output/
+# Real timetable fixtures contain personal course/teacher information.
+
+# Synced references, private source documents and local device reports
+sources/
+PROJECT_HANDOFF.md
+docs/REAL_DEVICE_TEST_REPORT.md
+docs/DEVICE_TEST_PROFILE.md
+docs/DEVICE_TEST_ENVIRONMENT_REPORT.md
+packages/schedule_core/test/fixtures/huang_extracted.json
+# Local tooling, generated platform state and secrets
+**/.gradle/
+**/local.properties
+**/key.properties
+*.jks
+*.keystore
+.env
+.env.*
+**/.flutter-plugins*
+**/ephemeral/
+**/flutter_export_environment.sh
+*.log
+*.apk
+*.aab

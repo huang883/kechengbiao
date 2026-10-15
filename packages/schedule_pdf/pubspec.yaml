@@ -1,0 +1,14 @@
+name: schedule_pdf
+description: PDFium extraction adapter for the verified school timetable template.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  crypto: ^3.0.7
+  pdfrx_engine: ^0.6.1
+  schedule_core:
+    path: ../schedule_core
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0

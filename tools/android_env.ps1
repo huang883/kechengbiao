@@ -1,0 +1,10 @@
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$toolRoot = Join-Path $env:USERPROFILE '.codex-tools'
+$env:FLUTTER_ROOT = Join-Path $toolRoot 'flutter'
+$env:ANDROID_HOME = Join-Path $toolRoot 'android-sdk'
+$env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
+$env:JAVA_HOME = 'C:\Program Files\java\jdk-21.0.10.7-hotspot'
+$env:PUB_CACHE = Join-Path $toolRoot 'pub-cache'
+$env:GRADLE_USER_HOME = Join-Path $toolRoot 'gradle'
+$env:PATH = "$env:FLUTTER_ROOT\bin;$env:ANDROID_HOME\platform-tools;$env:JAVA_HOME\bin;$env:PATH"
+$flutterExecutable = Join-Path $env:FLUTTER_ROOT 'bin\flutter.bat'
